@@ -1,0 +1,722 @@
+{% extends "base.html" %}
+{% block title %}BabySafe AI — Real-time Safety Assistant{% endblock %}
+
+{% block extra_head %}
+<style>
+  /* ── CHAT LAYOUT ── */
+  .chat-app {
+    display: flex;
+    flex-direction: column;
+    height: calc(100vh - 140px);
+    max-width: 800px;
+    margin: 0 auto;
+    position: relative;
+  }
+
+  .chat-container {
+    flex: 1;
+    overflow-y: auto;
+    padding: 1.5rem 1rem;
+    display: flex;
+    flex-direction: column;
+    gap: 1.5rem;
+    scroll-behavior: smooth;
+  }
+
+  /* ── MESSAGES ── */
+  .message {
+    display: flex;
+    flex-direction: column;
+    max-width: 85%;
+    animation: messageIn 0.3s ease-out;
+  }
+
+  @keyframes messageIn {
+    from {
+      opacity: 0;
+      transform: translateY(10px);
+    }
+
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+
+  .message.user {
+    align-self: flex-end;
+  }
+
+  .message.assistant {
+    align-self: flex-start;
+  }
+
+  .message-bubble {
+    padding: 1rem 1.25rem;
+    border-radius: 18px;
+    font-size: 0.95rem;
+    line-height: 1.5;
+    position: relative;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  }
+
+  .user .message-bubble {
+    background: var(--accent);
+    color: white;
+    border-bottom-right-radius: 4px;
+  }
+
+  .assistant .message-bubble {
+    background: var(--surface2);
+    color: var(--text);
+    border: 1px solid var(--border);
+    border-bottom-left-radius: 4px;
+  }
+
+  .message-info {
+    font-size: 0.7rem;
+    color: var(--text-muted);
+    margin-top: 6px;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+
+  .user .message-info {
+    align-self: flex-end;
+  }
+
+  /* ── INPUT BAR ── */
+  .input-area {
+    padding: 1rem;
+    background: var(--bg);
+    border-top: 1px solid var(--border);
+    position: sticky;
+    bottom: 0;
+  }
+
+  .input-wrapper {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 24px;
+    display: flex;
+    align-items: flex-end;
+    padding: 8px 12px;
+    gap: 8px;
+    transition: border-color 0.2s, box-shadow 0.2s;
+  }
+
+  .input-wrapper:focus-within {
+    border-color: var(--accent);
+    box-shadow: 0 0 0 3px rgba(212, 130, 26, 0.1);
+  }
+
+  #ingredientsInput {
+    background: transparent;
+    border: none;
+    padding: 8px 4px;
+    min-height: 24px;
+    max-height: 150px;
+    font-size: 1rem;
+    resize: none;
+    width: 100%;
+    color: var(--text);
+  }
+
+  #ingredientsInput:focus {
+    outline: none;
+  }
+
+  .action-btn {
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    transition: all 0.2s;
+    color: var(--text-muted);
+    background: transparent;
+    border: none;
+    flex-shrink: 0;
+  }
+
+  .action-btn:hover {
+    background: var(--surface2);
+    color: var(--accent);
+  }
+
+  .action-btn.send-btn {
+    background: var(--accent);
+    color: white;
+  }
+
+  .action-btn.send-btn:hover {
+    background: #BF7015;
+    transform: scale(1.05);
+  }
+
+  .action-btn.active-mic {
+    background: var(--high);
+    color: white;
+    animation: pulseMic 1.5s infinite;
+  }
+
+  @keyframes pulseMic {
+    0% {
+      box-shadow: 0 0 0 0 rgba(192, 57, 43, 0.4);
+    }
+
+    70% {
+      box-shadow: 0 0 0 10px rgba(192, 57, 43, 0);
+    }
+
+    100% {
+      box-shadow: 0 0 0 0 rgba(192, 57, 43, 0);
+    }
+  }
+
+  /* ── RESULT CARDS ── */
+  .result-card {
+    margin-top: 1rem;
+    width: 100%;
+  }
+
+  .typing-indicator {
+    display: flex;
+    gap: 4px;
+    padding: 4px 8px;
+  }
+
+  .dot {
+    width: 6px;
+    height: 6px;
+    background: var(--text-muted);
+    border-radius: 50%;
+    animation: typing 1.4s infinite;
+  }
+
+  .dot:nth-child(2) {
+    animation-delay: 0.2s;
+  }
+
+  .dot:nth-child(3) {
+    animation-delay: 0.4s;
+  }
+
+  @keyframes typing {
+
+    0%,
+    60%,
+    100% {
+      transform: translateY(0);
+      opacity: 0.4;
+    }
+
+    30% {
+      transform: translateY(-4px);
+      opacity: 1;
+    }
+  }
+
+  /* ── CUSTOM SCROLLBAR ── */
+  .chat-container::-webkit-scrollbar {
+    width: 4px;
+  }
+
+  .chat-container::-webkit-scrollbar-track {
+    background: transparent;
+  }
+
+  .chat-container::-webkit-scrollbar-thumb {
+    background: var(--border);
+    border-radius: 10px;
+  }
+
+  /* ── COMPACT GAUGE ── */
+  .compact-gauge {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    margin-bottom: 0.75rem;
+  }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="chat-app">
+  <div class="chat-container" id="chatContainer">
+    <!-- Welcome Message -->
+    <div class="message assistant">
+      <div class="message-bubble">
+        Hello! I'm your <strong>BabySafe Assistant</strong>. 🍼<br><br>
+        Send me an ingredient list, a photo, or use your voice to ask about product safety for babies.
+      </div>
+      <div class="message-info">System Assistant</div>
+    </div>
+  </div>
+
+  <div class="input-area">
+    <div class="input-wrapper">
+      <button class="action-btn" title="Take Photo" onclick="openCamera()">
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+          stroke-linecap="round" stroke-linejoin="round">
+          <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z" />
+          <circle cx="12" cy="13" r="4" />
+        </svg>
+      </button>
+      <button class="action-btn" title="Upload Image" onclick="document.getElementById('fileInput').click()">
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+          stroke-linecap="round" stroke-linejoin="round">
+          <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+          <polyline points="17 8 12 3 7 8" />
+          <line x1="12" y1="3" x2="12" y2="15" />
+        </svg>
+      </button>
+      <input type="file" id="fileInput" hidden accept="image/*" onchange="handleFileUpload(event)">
+
+      <textarea id="ingredientsInput" placeholder="Paste ingredients..." rows="1" oninput="autoResize(this)"></textarea>
+
+      <button id="micBtn" class="action-btn" title="Voice Input" onclick="toggleVoiceInput()">
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+          stroke-linecap="round" stroke-linejoin="round">
+          <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z" />
+          <path d="M19 10v2a7 7 0 0 1-14 0v-2" />
+          <line x1="12" y1="19" x2="12" y2="23" />
+          <line x1="8" y1="23" x2="16" y2="23" />
+        </svg>
+      </button>
+
+      <button class="action-btn send-btn" id="sendBtn" onclick="handleSend()">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"
+          stroke-linecap="round" stroke-linejoin="round">
+          <line x1="22" y1="2" x2="11" y2="13" />
+          <polygon points="22 2 15 22 11 13 2 9 22 2" />
+        </svg>
+      </button>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+  let isListening = false;
+  let recognition = null;
+  let lastAnalysisResult = null;
+
+  // Initialize Web Speech API
+  if ('webkitSpeechRecognition' in window || 'SpeechRecognition' in window) {
+    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+    recognition = new SpeechRecognition();
+    recognition.continuous = false;
+    recognition.interimResults = false;
+    recognition.lang = 'en-US';
+
+    recognition.onstart = () => {
+      isListening = true;
+      document.getElementById('micBtn').classList.add('active-mic');
+      document.getElementById('ingredientsInput').placeholder = "Listening...";
+    };
+
+    recognition.onend = () => {
+      isListening = false;
+      document.getElementById('micBtn').classList.remove('active-mic');
+      document.getElementById('ingredientsInput').placeholder = "Paste ingredients...";
+    };
+
+    recognition.onresult = (event) => {
+      const transcript = event.results[0][0].transcript;
+      const input = document.getElementById('ingredientsInput');
+      input.value += (input.value ? ' ' : '') + transcript;
+      autoResize(input);
+    };
+
+    recognition.onerror = (event) => {
+      showToast('Speech error: ' + event.error, 'error');
+    };
+  }
+
+  function toggleVoiceInput() {
+    if (!recognition) {
+      const isLocal = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
+      const msg = isLocal
+        ? "Speech recognition not supported in this browser."
+        : "Voice input requires HTTPS or localhost. If you are accessing this remotely, please use http://localhost:5001 or enable the 'unsafely-treat-insecure-origin-as-secure' flag in chrome://flags.";
+      showToast(msg, "error");
+      return;
+    }
+    if (isListening) {
+      recognition.stop();
+    } else {
+      recognition.start();
+    }
+  }
+
+  function autoResize(el) {
+    el.style.height = 'auto';
+    el.style.height = el.scrollHeight + 'px';
+  }
+
+  function appendMessage(role, content, isHtml = false) {
+    const container = document.getElementById('chatContainer');
+    const msgDiv = document.createElement('div');
+    msgDiv.className = `message ${role}`;
+
+    const bubble = document.createElement('div');
+    bubble.className = 'message-bubble';
+    if (isHtml) bubble.innerHTML = content;
+    else bubble.textContent = content;
+
+    const info = document.createElement('div');
+    info.className = 'message-info';
+    info.textContent = role === 'user' ? 'You' : 'BabySafe AI';
+
+    msgDiv.appendChild(bubble);
+    msgDiv.appendChild(info);
+    container.appendChild(msgDiv);
+    container.scrollTop = container.scrollHeight;
+    return msgDiv;
+  }
+
+  function showTypingIndicator() {
+    const container = document.getElementById('chatContainer');
+    const msgDiv = document.createElement('div');
+    msgDiv.className = 'message assistant typing-indicator-msg';
+    msgDiv.innerHTML = `
+      <div class="message-bubble">
+        <div class="typing-indicator">
+          <div class="dot"></div>
+          <div class="dot"></div>
+          <div class="dot"></div>
+        </div>
+      </div>
+    `;
+    container.appendChild(msgDiv);
+    container.scrollTop = container.scrollHeight;
+    return msgDiv;
+  }
+
+  function handleSend() {
+    const input = document.getElementById('ingredientsInput');
+    const text = input.value.trim();
+    if (!text) return;
+
+    appendMessage('user', text);
+    input.value = '';
+    input.style.height = 'auto';
+
+    startAnalysis(text);
+  }
+
+  async function startAnalysis(text) {
+    const loader = showTypingIndicator();
+
+    const assessments = [];
+    let summary = null;
+
+    try {
+      const response = await fetch('/api/analyze/stream', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ingredients: text, product_type: 'auto' })
+      });
+
+      if (!response.ok) throw new Error('Analysis request failed');
+
+      const reader = response.body.getReader();
+      const decoder = new TextDecoder();
+      let buffer = '';
+
+      // Remove loader when first data arrives or error
+      let loaderRemoved = false;
+
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+
+        buffer += decoder.decode(value, { stream: true });
+        const lines = buffer.split('\n');
+        buffer = lines.pop();
+
+        for (const line of lines) {
+          if (!line.startsWith('data: ')) continue;
+          if (!loaderRemoved) { loader.remove(); loaderRemoved = true; }
+
+          const payload = JSON.parse(line.slice(6));
+          if (payload.type === 'ingredient') assessments.push(payload.data);
+          else if (payload.type === 'summary') {
+            summary = payload.data;
+            renderAnalysisResult(summary, assessments);
+          } else if (payload.type === 'error') {
+            appendMessage('assistant', "I'm sorry, I encountered an error: " + payload.message);
+          }
+        }
+      }
+    } catch (err) {
+      if (!loaderRemoved) loader.remove();
+      appendMessage('assistant', "System error: " + err.message);
+    }
+  }
+
+  function renderAnalysisResult(summary, assessments) {
+    const html = `
+      <div class="result-card">
+        <div class="compact-gauge">
+          <div style="font-size: 1.5rem; font-weight: 700; color: ${summary.risk_color}">${summary.overall_risk_score.toFixed(1)}</div>
+          <div>
+            <div style="font-size: 0.8rem; font-weight: 600; text-transform: uppercase; color: var(--text-muted)">${summary.overall_risk_level}</div>
+            <div style="font-size: 0.9rem; font-weight: 500;">${summary.verdict}</div>
+          </div>
+        </div>
+        
+        <p style="margin-bottom: 1rem; font-size: 0.9rem; border-left: 2px solid var(--border); padding-left: 10px;">
+          I found <strong>${summary.total_count}</strong> ingredients. 
+          <strong>${summary.flagged_count}</strong> are flagged for potential concern.
+        </p>
+ 
+        <div style="display:flex; gap: 8px; flex-wrap: wrap; margin-bottom: 1rem;">
+          ${summary.recommendations.map(r => `
+            <div style="font-size: 0.8rem; background: ${r.priority === 'critical' ? 'var(--high)' : 'var(--surface2)'}20; border: 1px solid ${r.priority === 'critical' ? 'var(--high)' : 'var(--border)'}; padding: 4px 10px; border-radius: 12px; color: ${r.priority === 'critical' ? 'var(--high)' : 'var(--text)'}">
+              ${r.text}
+            </div>
+          `).join('')}
+        </div>
+
+        <button class="btn btn-ghost" style="width: 100%; border-radius: 12px; font-size: 0.8rem;" onclick="showTableModals('${encodeURIComponent(JSON.stringify(assessments))}')">
+          View Detailed Breakdown →
+        </button>
+      </div>
+    `;
+    appendMessage('assistant', html, true);
+    lastAnalysisResult = { summary, assessments };
+  }
+
+  function showTableModals(encodedData) {
+    const data = JSON.parse(decodeURIComponent(encodedData));
+    const modal = document.createElement('div');
+    modal.style = "position:fixed; top:0; left:0; width:100%; height:100%; background:var(--bg); z-index:2000; overflow-y:auto; padding: 2rem;";
+    modal.innerHTML = `
+      <div style="max-width: 1000px; margin: 0 auto;">
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom: 2rem;">
+          <h2>Ingredient Breakdown</h2>
+          <button class="btn btn-secondary" onclick="this.closest('div').parentElement.parentElement.remove()">Close</button>
+        </div>
+        <table style="width:100%; border-collapse: collapse; font-size: 0.9rem;">
+          <thead>
+            <tr style="border-bottom: 2px solid var(--border); text-align: left;">
+              <th style="padding: 10px;">Ingredient</th>
+              <th style="padding: 10px;">Risk</th>
+              <th style="padding: 10px;">Score</th>
+              <th style="padding: 10px;">Flags</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${data.map(item => `
+              <tr style="border-bottom: 1px solid var(--border);">
+                <td style="padding: 10px;"><strong>${item.name}</strong><br><small style="color:var(--text-muted)">${item.matched_as}</small></td>
+                <td style="padding: 10px;"><span class="risk-badge risk-${item.risk_level.toLowerCase()}">${item.risk_level}</span></td>
+                <td style="padding: 10px;">${item.baby_risk_score.toFixed(1)}</td>
+                <td style="padding: 10px;">${(item.flags || []).map(f => `<span class="flag-chip" style="color:${f.color}">${f.code}</span>`).join(' ')}</td>
+              </tr>
+            `).join('')}
+          </tbody>
+        </table>
+      </div>
+    `;
+    document.body.appendChild(modal);
+  }
+
+  // Camera & OCR (Integrated with Chat)
+  let currentStream = null;
+  let currentFacingMode = 'environment';
+
+  async function openCamera() {
+    if (!window.isSecureContext && window.location.hostname !== 'localhost' && window.location.hostname !== '127.0.0.1') {
+      const html = `
+        <div style="text-align: left; font-size: 0.85rem;">
+          <p><strong>Camera requires a Secure Context.</strong></p>
+          <ol style="margin: 8px 0 8px 18px;">
+            <li>Use <strong>http://localhost:5001</strong> if on this PC.</li>
+            <li>If on a phone, enable <strong>unsafely-treat-insecure-origin-as-secure</strong> in <code>chrome://flags</code> for <code>${window.location.origin}</code>.</li>
+          </ol>
+        </div>
+      `;
+      appendMessage('assistant', html, true);
+      showToast("Camera blocked: Not a secure context", "error");
+      return;
+    }
+
+    const modal = document.createElement('div');
+    modal.id = 'cameraModal';
+    modal.style = "position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.95); z-index:3000; display:flex; flex-direction:column; align-items:center; justify-content:center; padding:1rem;";
+    modal.innerHTML = `
+      <div style="position:relative; width:100%; max-width:500px;">
+        <video id="v" style="width:100%; border-radius:12px; background:#000;" autoplay playsinline muted></video>
+        <div style="position:absolute; top:10px; right:10px; display:flex; gap:8px;">
+          <button id="switchCam" class="action-btn" style="background:rgba(0,0,0,0.5); color:white;" title="Switch Camera">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M23 4v6h-6"/><path d="M1 20v-6h6"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg>
+          </button>
+        </div>
+      </div>
+      <div style="display:flex; gap:1rem; margin-top:1rem;">
+        <button id="snap" class="btn btn-primary">📸 Capture</button>
+        <button class="btn btn-ghost" onclick="closeCamera()">Cancel</button>
+      </div>
+      <canvas id="c" style="display:none"></canvas>
+    `;
+    document.body.appendChild(modal);
+
+    const v = modal.querySelector('#v');
+    const switchBtn = modal.querySelector('#switchCam');
+
+    async function startStream(mode) {
+      if (currentStream) {
+        currentStream.getTracks().forEach(t => t.stop());
+      }
+
+      const constraints = {
+        video: {
+          facingMode: mode,
+          width: { ideal: 1920 },
+          height: { ideal: 1080 }
+        }
+      };
+
+      try {
+        currentStream = await navigator.mediaDevices.getUserMedia(constraints);
+        v.srcObject = currentStream;
+        currentFacingMode = mode;
+
+        // Ensure video plays
+        v.onloadedmetadata = () => {
+          v.play().catch(e => console.error("Video play error:", e));
+        };
+      } catch (e) {
+        console.error("Camera error:", e);
+        // Fallback to simpler constraints if ideal fails
+        if (constraints.video.width) {
+          delete constraints.video.width;
+          delete constraints.video.height;
+          try {
+            currentStream = await navigator.mediaDevices.getUserMedia(constraints);
+            v.srcObject = currentStream;
+            v.play().catch(e => console.error("Video play error:", e));
+            return;
+          } catch (e2) {
+            console.error("Secondary camera error:", e2);
+          }
+        }
+
+        if (mode === 'environment') {
+          startStream('user');
+        } else {
+          closeCamera();
+          showToast("Could not access camera: " + e.message, "error");
+        }
+      }
+    }
+
+    switchBtn.onclick = () => {
+      startStream(currentFacingMode === 'environment' ? 'user' : 'environment');
+    };
+
+    window.closeCamera = () => {
+      if (currentStream) {
+        currentStream.getTracks().forEach(t => t.stop());
+        currentStream = null;
+      }
+      modal.remove();
+    };
+
+    await startStream(currentFacingMode);
+
+    modal.querySelector('#snap').onclick = async () => {
+      const c = modal.querySelector('#c');
+      const ctx = c.getContext('2d');
+
+      // Aim for max 1600px to keep OCR accurate but payload small
+      const MAX_W = 1600;
+      let w = v.videoWidth || 640;
+      let h = v.videoHeight || 480;
+
+      if (w > MAX_W) {
+        h = Math.round((h * MAX_W) / w);
+        w = MAX_W;
+      }
+
+      c.width = w;
+      c.height = h;
+      ctx.drawImage(v, 0, 0, w, h);
+
+      const dataUrl = c.toDataURL('image/jpeg', 0.90);
+      closeCamera();
+      processOCR(dataUrl);
+    };
+  }
+
+  function handleFileUpload(e) {
+    const file = e.target.files[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = async (ev) => {
+      // For uploads, we also want to compress if they are huge mobile photos
+      const img = new Image();
+      img.onload = () => {
+        const c = document.createElement('canvas');
+        const MAX_W = 1600;
+        let w = img.width;
+        let h = img.height;
+        if (w > MAX_W) {
+          h = Math.round((h * MAX_W) / w);
+          w = MAX_W;
+        }
+        c.width = w; c.height = h;
+        c.getContext('2d').drawImage(img, 0, 0, w, h);
+        processOCR(c.toDataURL('image/jpeg', 0.85));
+      };
+      img.src = ev.target.result;
+    };
+    reader.readAsDataURL(file);
+  }
+
+  async function processOCR(dataUrl) {
+    const loader = showTypingIndicator();
+    try {
+      showToast('Processing image...', 'info');
+      const res = await fetch('/api/ocr', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ image: dataUrl })
+      });
+      const data = await res.json();
+      loader.remove();
+      if (data.success && data.text) {
+        const input = document.getElementById('ingredientsInput');
+        input.value = data.text;
+        autoResize(input);
+        showToast('Text extracted!');
+      } else {
+        throw new Error(data.error || "No text found in image.");
+      }
+    } catch (err) {
+      if (loader) loader.remove();
+      showToast('OCR Failed: ' + err.message, 'error');
+    }
+  }
+
+  // Initial focus
+  document.addEventListener('DOMContentLoaded', () => {
+    document.getElementById('ingredientsInput').focus();
+
+    // Keyboard support
+    document.getElementById('ingredientsInput').addEventListener('keydown', e => {
+      if (e.key === 'Enter' && !e.shiftKey) {
+        e.preventDefault();
+        handleSend();
+      }
+    });
+  });
+</script>
+{% endblock %}

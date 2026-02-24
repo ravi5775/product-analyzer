@@ -1,0 +1,334 @@
+{% extends "base.html" %}
+{% block title %}BabySafe — Ingredient Search{% endblock %}
+
+{% block extra_head %}
+<style>
+  .search-hero { text-align: center; padding: 2.5rem 1rem 1.5rem; }
+  .search-hero h1 { font-size: 2rem; font-weight: 700; letter-spacing: -0.03em; }
+  .search-hero h1 span { color: var(--accent); }
+  .search-hero p { color: var(--text-muted); font-size: 0.95rem; margin-top: 0.5rem; }
+
+  .search-wrap {
+    max-width: 640px; margin: 0 auto 2rem;
+    position: relative;
+  }
+  .search-input-row {
+    display: flex; gap: 8px;
+  }
+  .search-input-row input {
+    font-size: 1rem; padding: 0.75rem 1rem;
+    border-radius: 10px;
+  }
+  .search-btn {
+    padding: 0.75rem 1.5rem; border-radius: 10px; white-space: nowrap;
+  }
+
+  .autocomplete-dropdown {
+    position: absolute; top: 100%; left: 0; right: 0;
+    background: var(--surface2); border: 1px solid var(--border);
+    border-radius: 10px; margin-top: 4px; z-index: 50;
+    overflow: hidden; box-shadow: 0 8px 32px rgba(0,0,0,0.4);
+    max-height: 240px; overflow-y: auto;
+  }
+  .autocomplete-item {
+    padding: 0.6rem 1rem; cursor: pointer;
+    font-size: 0.9rem; transition: background 0.1s;
+    border-bottom: 1px solid var(--border);
+  }
+  .autocomplete-item:last-child { border-bottom: none; }
+  .autocomplete-item:hover { background: var(--surface); }
+
+  /* ── PROFILE CARD ── */
+  .profile-grid {
+    display: grid; grid-template-columns: 1fr 1fr; gap: 1.25rem;
+    max-width: 900px; margin: 0 auto;
+  }
+  @media (max-width: 700px) { .profile-grid { grid-template-columns: 1fr; } }
+
+  .profile-header {
+    grid-column: 1 / -1;
+    display: flex; align-items: center; gap: 1.5rem;
+    flex-wrap: wrap;
+  }
+  .profile-name {
+    font-size: 1.6rem; font-weight: 700; letter-spacing: -0.02em;
+  }
+
+  .score-ring {
+    width: 80px; height: 80px; flex-shrink: 0;
+    position: relative; display: flex; align-items: center; justify-content: center;
+  }
+  .score-ring svg { position: absolute; top: 0; left: 0; width: 100%; height: 100%; transform: rotate(-90deg); }
+  .score-ring-text {
+    font-family: var(--mono); font-size: 1.3rem; font-weight: 600; z-index: 1;
+  }
+
+  .profile-meta { display: flex; flex-direction: column; gap: 6px; }
+  .profile-meta .name-row { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+  .profile-meta .alt-names { font-size: 0.8rem; color: var(--text-muted); }
+
+  .detail-row {
+    display: flex; justify-content: space-between; align-items: center;
+    padding: 0.55rem 0; border-bottom: 1px solid var(--border); font-size: 0.88rem;
+  }
+  .detail-row:last-child { border-bottom: none; }
+  .detail-label { color: var(--text-muted); font-size: 0.8rem; }
+  .detail-value { font-family: var(--mono); font-weight: 500; }
+
+  .yes-badge  { color: var(--high);   background: rgba(192,57,43,0.12);  padding: 2px 8px; border-radius: 4px; font-size: 0.78rem; }
+  .no-badge   { color: var(--safe);   background: rgba(39,174,96,0.10);   padding: 2px 8px; border-radius: 4px; font-size: 0.78rem; }
+
+  .health-text { font-size: 0.88rem; line-height: 1.6; color: var(--text-muted); }
+  .alt-chip {
+    display: inline-block; padding: 3px 10px; border-radius: 12px;
+    background: var(--surface2); border: 1px solid var(--border);
+    font-size: 0.78rem; margin: 3px;
+  }
+
+  .no-result {
+    text-align: center; padding: 3rem 1rem;
+    color: var(--text-muted);
+  }
+
+  .db-stats-bar {
+    display: flex; gap: 1rem; flex-wrap: wrap;
+    justify-content: center; margin: 1rem auto;
+    max-width: 600px;
+  }
+  .db-stat {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: 8px; padding: 0.5rem 1rem; text-align: center;
+    min-width: 100px;
+  }
+  .db-stat .val { font-family: var(--mono); font-size: 1.2rem; font-weight: 600; color: var(--accent); }
+  .db-stat .lbl { font-size: 0.72rem; color: var(--text-muted); }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="search-hero">
+  <h1>Ingredient <span>Lookup</span></h1>
+  <p>Search our database of 188 indexed ingredients for detailed safety profiles</p>
+</div>
+
+<!-- DB Stats -->
+<div class="db-stats-bar" id="dbStats">
+  <div class="db-stat"><div class="val">188</div><div class="lbl">Ingredients</div></div>
+  <div class="db-stat"><div class="val" id="statHarmful">–</div><div class="lbl">Harmful</div></div>
+  <div class="db-stat"><div class="val" id="statEU">–</div><div class="lbl">EU Banned</div></div>
+  <div class="db-stat"><div class="val" id="statED">–</div><div class="lbl">Endocrine Disruptors</div></div>
+</div>
+
+<div class="search-wrap">
+  <div class="search-input-row">
+    <input type="text" id="searchInput" placeholder="e.g. Methylparaben, Sodium Lauryl Sulfate, Glycerin…"
+      autocomplete="off"
+      oninput="onSearchInput()"
+      onkeydown="if(event.key==='Enter') doSearch()">
+    <button class="btn btn-primary search-btn" onclick="doSearch()">Search</button>
+  </div>
+  <div class="autocomplete-dropdown" id="acDropdown" style="display:none;"></div>
+</div>
+
+<div id="searchResult"></div>
+
+{% endblock %}
+
+{% block extra_js %}
+<script>
+let acTimeout = null;
+
+// Load DB stats on page load
+fetch('/api/stats').then(r => r.json()).then(d => {
+  document.getElementById('statHarmful').textContent = d.harmful_count;
+  document.getElementById('statEU').textContent = d.eu_banned_count;
+  document.getElementById('statED').textContent = d.endocrine_disruptors;
+});
+
+function onSearchInput() {
+  clearTimeout(acTimeout);
+  const q = document.getElementById('searchInput').value.trim();
+  if (q.length < 2) {
+    document.getElementById('acDropdown').style.display = 'none';
+    return;
+  }
+  acTimeout = setTimeout(() => fetchAutocomplete(q), 200);
+}
+
+function fetchAutocomplete(q) {
+  fetch('/api/autocomplete?q=' + encodeURIComponent(q))
+    .then(r => r.json())
+    .then(names => {
+      const dd = document.getElementById('acDropdown');
+      if (!names.length) { dd.style.display = 'none'; return; }
+      dd.innerHTML = names.map(n =>
+        `<div class="autocomplete-item" onclick="selectAC('${n.replace(/'/g,"\'")}')">${n}</div>`
+      ).join('');
+      dd.style.display = 'block';
+    });
+}
+
+function selectAC(name) {
+  document.getElementById('searchInput').value = name;
+  document.getElementById('acDropdown').style.display = 'none';
+  doSearch();
+}
+
+document.addEventListener('click', e => {
+  if (!e.target.closest('.search-wrap'))
+    document.getElementById('acDropdown').style.display = 'none';
+});
+
+function doSearch() {
+  const q = document.getElementById('searchInput').value.trim();
+  document.getElementById('acDropdown').style.display = 'none';
+  if (!q) return;
+
+  document.getElementById('searchResult').innerHTML = `
+    <div style="text-align:center;padding:2rem;color:var(--text-muted);">
+      <div style="display:flex;gap:6px;justify-content:center;">
+        <div class="loading-dot" style="width:8px;height:8px;border-radius:50%;background:var(--accent);animation:blink 0.8s infinite alternate;display:inline-block;"></div>
+        <div class="loading-dot" style="width:8px;height:8px;border-radius:50%;background:var(--accent);animation:blink 0.8s 0.2s infinite alternate;display:inline-block;"></div>
+        <div class="loading-dot" style="width:8px;height:8px;border-radius:50%;background:var(--accent);animation:blink 0.8s 0.4s infinite alternate;display:inline-block;"></div>
+      </div>
+      <p style="margin-top:8px;">Looking up <strong>${q}</strong>…</p>
+    </div>
+    <style>@keyframes blink{from{opacity:0.2}to{opacity:1}}</style>
+  `;
+
+  fetch('/api/search?q=' + encodeURIComponent(q))
+    .then(r => r.json())
+    .then(renderProfile)
+    .catch(err => {
+      document.getElementById('searchResult').innerHTML =
+        `<div class="no-result">Error: ${err.message}</div>`;
+    });
+}
+
+function getRiskColor(level) {
+  const m = {safe:'#27AE60',low:'#7DAF88',moderate:'#D4821A',high:'#C0392B',harmful:'#8B0000'};
+  return m[(level||'').toLowerCase()] || '#666';
+}
+
+function renderProfile(data) {
+  if (!data.found) {
+    document.getElementById('searchResult').innerHTML = `
+      <div class="no-result">
+        <div style="font-size:2rem;margin-bottom:0.5rem">🔍</div>
+        <strong>Not found:</strong> "${data.query}"<br>
+        <span style="font-size:0.85rem">Try a different name or spelling</span>
+      </div>`;
+    return;
+  }
+
+  const a = data.assessment;
+  const riskColor = getRiskColor(a.risk_level);
+  const scoreCircumference = 2 * Math.PI * 30; // r=30
+  const scoreOffset = scoreCircumference * (1 - Math.min(10, a.risk_score) / 10);
+
+  const flagsHTML = (a.flags && a.flags.length)
+    ? a.flags.map(f => `<span class="flag-chip" style="color:${f.color};border-color:${f.color}">${f.label}</span>`).join(' ')
+    : '<span style="color:var(--safe);font-size:0.85rem">✓ No flags</span>';
+
+  const altNamesHTML = (a.matched_as !== a.name)
+    ? `<span class="alt-chip">${a.matched_as}</span>`
+    : '';
+
+  const saferHTML = a.safer_alternatives && a.safer_alternatives !== 'nan'
+    ? a.safer_alternatives.split(',').map(s => `<span class="alt-chip">${s.trim()}</span>`).join('')
+    : '<span style="color:var(--text-muted);font-size:0.85rem">—</span>';
+
+  document.getElementById('searchResult').innerHTML = `
+    <div class="profile-grid">
+      <!-- Header -->
+      <div class="card profile-header">
+        <div class="score-ring">
+          <svg viewBox="0 0 80 80">
+            <circle cx="40" cy="40" r="30" fill="none" stroke="var(--border)" stroke-width="8"/>
+            <circle cx="40" cy="40" r="30" fill="none" stroke="${riskColor}" stroke-width="8"
+              stroke-dasharray="${scoreCircumference}"
+              stroke-dashoffset="${scoreOffset}"
+              stroke-linecap="round"/>
+          </svg>
+          <span class="score-ring-text" style="color:${riskColor}">${a.risk_score.toFixed(1)}</span>
+        </div>
+        <div class="profile-meta">
+          <div class="name-row">
+            <div class="profile-name">${a.matched_as}</div>
+            <span class="risk-badge risk-${a.risk_level.toLowerCase()}">${a.risk_level}</span>
+            ${a.low_confidence ? '<span style="color:var(--moderate);font-size:0.8rem">⚠ Low confidence match</span>' : ''}
+          </div>
+          <div class="alt-names">Searched as: <em>${a.name}</em> · Match: ${a.match_method} (${a.match_confidence}%)</div>
+          <div style="margin-top:4px">${flagsHTML}</div>
+        </div>
+      </div>
+
+      <!-- Safety scores -->
+      <div class="card">
+        <div class="card-title">Safety Scores</div>
+        <div class="detail-row">
+          <span class="detail-label">Risk Score (0–10)</span>
+          <span class="detail-value" style="color:${riskColor}">${a.risk_score.toFixed(1)}</span>
+        </div>
+        <div class="detail-row">
+          <span class="detail-label">Baby Risk Score</span>
+          <span class="detail-value" style="color:${a.baby_risk_score >= 7 ? 'var(--high)' : 'var(--text)'}">${a.baby_risk_score.toFixed(1)}</span>
+        </div>
+        <div class="detail-row">
+          <span class="detail-label">Risk Tier</span>
+          <span class="detail-value">${a.risk_tier} / 4</span>
+        </div>
+        <div class="detail-row">
+          <span class="detail-label">Absorption Rate</span>
+          <span class="detail-value">${a.absorption_rate} / 5</span>
+        </div>
+        <div class="detail-row">
+          <span class="detail-label">Is Harmful</span>
+          <span>${a.is_harmful ? '<span class="yes-badge">Yes</span>' : '<span class="no-badge">No</span>'}</span>
+        </div>
+      </div>
+
+      <!-- Regulatory -->
+      <div class="card">
+        <div class="card-title">Regulatory Flags</div>
+        <div class="detail-row">
+          <span class="detail-label">Endocrine Disruptor</span>
+          <span>${a.endocrine_disruptor ? '<span class="yes-badge">Yes ⚠</span>' : '<span class="no-badge">No</span>'}</span>
+        </div>
+        <div class="detail-row">
+          <span class="detail-label">Potential Carcinogen</span>
+          <span>${a.potential_carcinogen ? '<span class="yes-badge">Yes ⚠</span>' : '<span class="no-badge">No</span>'}</span>
+        </div>
+        <div class="detail-row">
+          <span class="detail-label">Skin Sensitizer</span>
+          <span>${a.skin_sensitizer ? '<span class="yes-badge">Yes</span>' : '<span class="no-badge">No</span>'}</span>
+        </div>
+        <div class="detail-row">
+          <span class="detail-label">EU Banned/Restricted</span>
+          <span>${a.eu_banned ? '<span class="yes-badge">Yes 🇪🇺</span>' : '<span class="no-badge">No</span>'}</span>
+        </div>
+      </div>
+
+      <!-- Health Effects -->
+      <div class="card">
+        <div class="card-title">Health Effects</div>
+        <p class="health-text">${a.health_effects || 'No specific health effects data available.'}</p>
+        ${a.recommended_action ? `<div style="margin-top:0.75rem;padding:0.6rem 0.8rem;border-radius:6px;background:var(--surface2);font-size:0.83rem;color:var(--accent);">📋 ${a.recommended_action}</div>` : ''}
+      </div>
+
+      <!-- Safer Alternatives -->
+      <div class="card">
+        <div class="card-title">Safer Alternatives</div>
+        <div>${saferHTML}</div>
+      </div>
+
+      <!-- Also known as -->
+      <div class="card">
+        <div class="card-title">Also Known As</div>
+        <div>${altNamesHTML || '<span style="color:var(--text-muted);font-size:0.85rem">No alternative names</span>'}</div>
+      </div>
+    </div>
+  `;
+}
+</script>
+{% endblock %}

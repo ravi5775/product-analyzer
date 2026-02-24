@@ -1,0 +1,211 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>{% block title %}BabySafe — Ingredient Analyzer{% endblock %}</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@300;400;500&family=Outfit:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg:         #0F0E0C;
+      --surface:    #1A1208;
+      --surface2:   #221A0E;
+      --border:     #2E2416;
+      --accent:     #D4821A;
+      --accent-dim: #7A4A10;
+      --text:       #E8DECC;
+      --text-muted: #8A7A66;
+      --safe:       #27AE60;
+      --low:        #7DAF88;
+      --moderate:   #D4821A;
+      --high:       #C0392B;
+      --harmful:    #8B0000;
+      --unknown:    #666;
+      --mono:       'DM Mono', monospace;
+      --body:       'Outfit', sans-serif;
+    }
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    html { scroll-behavior: smooth; }
+    body {
+      font-family: var(--body);
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+    }
+
+    /* ── NAV ── */
+    .nav {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0 2rem;
+      height: 64px;
+      background: var(--surface);
+      border-bottom: 1px solid var(--border);
+      position: sticky;
+      top: 0;
+      z-index: 100;
+      backdrop-filter: blur(8px);
+    }
+    .nav-logo {
+      display: flex; align-items: center; gap: 10px;
+      font-weight: 700; font-size: 1.1rem; letter-spacing: -0.02em;
+      text-decoration: none; color: var(--text);
+    }
+    .nav-logo-icon {
+      width: 32px; height: 32px; border-radius: 8px;
+      background: linear-gradient(135deg, var(--accent), #8B4500);
+      display: flex; align-items: center; justify-content: center;
+      font-size: 16px;
+    }
+    .nav-links { display: flex; gap: 0.25rem; }
+    .nav-link {
+      padding: 0.45rem 1rem; border-radius: 8px;
+      text-decoration: none; color: var(--text-muted);
+      font-size: 0.9rem; font-weight: 500;
+      transition: all 0.15s;
+    }
+    .nav-link:hover, .nav-link.active {
+      background: var(--surface2);
+      color: var(--text);
+    }
+    .nav-link.active { color: var(--accent); }
+
+    /* ── MAIN ── */
+    main { flex: 1; padding: 2rem; max-width: 1280px; margin: 0 auto; width: 100%; }
+
+    /* ── CARDS ── */
+    .card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 1.5rem;
+    }
+    .card-title {
+      font-size: 0.75rem; font-weight: 600; letter-spacing: 0.1em;
+      text-transform: uppercase; color: var(--text-muted);
+      margin-bottom: 1rem;
+    }
+
+    /* ── BUTTONS ── */
+    .btn {
+      display: inline-flex; align-items: center; gap: 8px;
+      padding: 0.6rem 1.25rem; border-radius: 8px; border: none;
+      font-family: var(--body); font-size: 0.9rem; font-weight: 600;
+      cursor: pointer; transition: all 0.15s;
+    }
+    .btn-primary {
+      background: var(--accent); color: #fff;
+    }
+    .btn-primary:hover { background: #BF7015; transform: translateY(-1px); }
+    .btn-ghost {
+      background: transparent; color: var(--text-muted);
+      border: 1px solid var(--border);
+    }
+    .btn-ghost:hover { background: var(--surface2); color: var(--text); }
+
+    /* ── RISK BADGES ── */
+    .risk-badge {
+      display: inline-flex; align-items: center;
+      padding: 2px 10px; border-radius: 20px;
+      font-family: var(--mono); font-size: 0.75rem; font-weight: 500;
+    }
+    .risk-safe     { background: rgba(39,174,96,0.15);  color: var(--safe); }
+    .risk-low      { background: rgba(125,175,136,0.15); color: var(--low); }
+    .risk-moderate { background: rgba(212,130,26,0.15); color: var(--moderate); }
+    .risk-high     { background: rgba(192,57,43,0.15);  color: var(--high); }
+    .risk-harmful  { background: rgba(139,0,0,0.20);    color: var(--harmful); }
+    .risk-unknown  { background: rgba(102,102,102,0.15); color: var(--unknown); }
+
+    /* ── FLAG CHIPS ── */
+    .flag-chip {
+      display: inline-flex; align-items: center; gap: 4px;
+      padding: 2px 8px; border-radius: 4px; font-size: 0.7rem;
+      font-family: var(--mono); font-weight: 600;
+      border: 1px solid currentColor;
+    }
+
+    /* ── FORMS ── */
+    input, textarea, select {
+      background: var(--surface2); border: 1px solid var(--border);
+      color: var(--text); padding: 0.6rem 0.9rem; border-radius: 8px;
+      font-family: var(--body); font-size: 0.9rem; outline: none;
+      transition: border-color 0.15s; width: 100%;
+    }
+    input:focus, textarea:focus, select:focus {
+      border-color: var(--accent);
+    }
+
+    /* ── TOAST ── */
+    .toast-container {
+      position: fixed; bottom: 1.5rem; right: 1.5rem; z-index: 9999;
+      display: flex; flex-direction: column; gap: 8px;
+    }
+    .toast {
+      background: var(--surface2); border: 1px solid var(--border);
+      border-radius: 10px; padding: 0.75rem 1rem;
+      font-size: 0.875rem; max-width: 320px;
+      animation: slideIn 0.2s ease;
+    }
+    @keyframes slideIn { from { transform: translateX(100%); opacity: 0; } }
+
+    /* ── FOOTER ── */
+    footer {
+      text-align: center; padding: 1.5rem;
+      font-size: 0.8rem; color: var(--text-muted);
+      border-top: 1px solid var(--border);
+    }
+
+    /* ── SCROLLBAR ── */
+    ::-webkit-scrollbar { width: 6px; }
+    ::-webkit-scrollbar-track { background: var(--bg); }
+    ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+
+    /* ── RESPONSIVE ── */
+    @media (max-width: 768px) {
+      main { padding: 1rem; }
+      .nav { padding: 0 1rem; }
+    }
+  </style>
+  {% block extra_head %}{% endblock %}
+</head>
+<body>
+  <nav class="nav">
+    <a href="/" class="nav-logo">
+      <div class="nav-logo-icon">🍼</div>
+      <span>BabySafe</span>
+    </a>
+    <div class="nav-links">
+      <a href="/" class="nav-link {% if request.path == '/' %}active{% endif %}">Analyze</a>
+      <a href="/search" class="nav-link {% if request.path == '/search' %}active{% endif %}">Search</a>
+    </div>
+  </nav>
+
+  <main>
+    {% block content %}{% endblock %}
+  </main>
+
+  <footer>
+    <p>BabySafe Ingredient Analyzer · 188 ingredients indexed · Data sourced from EWG, CosIng, FDA &amp; EU Safety Regulations</p>
+  </footer>
+
+  <div class="toast-container" id="toastContainer"></div>
+
+  <script>
+    function showToast(msg, type = 'info') {
+      const t = document.createElement('div');
+      t.className = 'toast';
+      t.style.borderLeftColor = type === 'error' ? 'var(--high)' : 'var(--accent)';
+      t.style.borderLeftWidth = '3px';
+      t.textContent = msg;
+      document.getElementById('toastContainer').appendChild(t);
+      setTimeout(() => t.remove(), 4000);
+    }
+  </script>
+  {% block extra_js %}{% endblock %}
+</body>
+</html>
